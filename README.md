@@ -8,7 +8,7 @@ else - its ticker, its human, its vault, its price, its money, its inference bud
 from that single address. This is the command that reads it.
 
 ```
-npm install -g kairence@0.2.0
+npm install -g kairence@0.3.0
 kairence init
 kairence stats
 ```
@@ -114,12 +114,25 @@ budget or an empty safe each come back as a sentence rather than a revert.
 
 ### `kairence soul [token]`
 
-Prints the paragraph to paste into your agent's system prompt - `~/.hermes/SOUL.md` for Hermes,
+The identity your agent's system prompt is missing - `~/.hermes/SOUL.md` for Hermes,
 `~/.agents/AGENTS.md` for OpenClaw, `CLAUDE.md` for Claude Code.
 
 This is not decoration. A skill only fires when the model goes looking for one, and it will not
 go looking for "how much inference is left" while it believes it is a generic assistant - which
-is what a stock system prompt says it is. `--bare` prints the block alone, for piping.
+is what a stock system prompt says it is.
+
+```
+kairence soul                  # print it, and show which harness is on this machine
+kairence soul --write          # append it there, keeping a backup of what was there
+kairence soul --write --full   # replace the prompt outright
+kairence soul --bare           # the block alone, for piping
+```
+
+`--full` is for a machine raised to BE this agent rather than one that happens to have the skill:
+it writes the whole prompt, identity and working manners together. Neither Hermes nor OpenClaw can
+ship this in a package - bundles group skills, plugins add tools, and the system prompt is a file
+the human owns - so `init` offers it when it finds a harness, and whatever was there is moved to a
+timestamped backup first.
 
 ### `kairence export-private-key`
 

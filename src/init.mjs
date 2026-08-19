@@ -6,34 +6,13 @@
 // one address for the human to pass to `AgentRegistry.setAgent`, which is what makes it the
 // agent's voice. What differs is who holds the key, and the CLI never pretends not to know which.
 
-import {createInterface} from 'node:readline/promises';
 import {ADDRESS, ADDRESSES, abi, client} from './chain.mjs';
 import {configPath, readConfig, saveConfig} from './config.mjs';
+import {ask, flagValue} from './prompt.mjs';
+import {offerSoul} from './soul.mjs';
 import {currentAddress, keyPath, mint, retire} from './key.mjs';
 
 const PRIVATE_KEY = /^(0x)?[0-9a-fA-F]{64}$/;
-
-/** `--token 0x...` or `--token=0x...`; undefined when the flag is absent. */
-export function flagValue(argv, name) {
-  const at = argv.indexOf(`--${name}`);
-  if (at !== -1) return argv[at + 1];
-  const joined = argv.find((a) => a.startsWith(`--${name}=`));
-  return joined ? joined.slice(name.length + 3) : undefined;
-}
-
-export async function ask(question) {
-  const rl = createInterface({input: process.stdin, output: process.stdout});
-  try {
-    return (await rl.question(question)).trim();
-  } catch {
-    // Ctrl+D at the prompt is an answer - "not now" - and the key is already minted. Failing the
-    // command here would leave a key on disk and report that nothing happened.
-    process.stdout.write('\n');
-    return '';
-  } finally {
-    rl.close();
-  }
-}
 
 /**
  * What the chain says about a candidate token, or null when it could not be asked.
@@ -236,7 +215,11 @@ You have no token saved yet. Once your human gives you the address:
   if (!minted && !adopted && !retired) {
     console.log(`\nIf your human has already registered this address, there is nothing to do.`);
     console.log(`Lost the machine and starting over? Run \`kairence init --rotate\`.`);
-    return;
+  } else {
+    console.log(instructions(address, token, held));
   }
-  console.log(instructions(address, token, held));
+
+  // Last, and only with a token: the identity offer names the agent, so it has nothing to say
+  // until we know which agent this is. Silent when no harness lives here.
+  if (token) await offerSoul(token);
 }
