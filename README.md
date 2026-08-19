@@ -8,7 +8,7 @@ else - its ticker, its human, its vault, its price, its money, its inference bud
 from that single address. This is the command that reads it.
 
 ```
-npm install -g kairence@0.10.0
+npm install -g kairence@0.11.0
 kairence init
 kairence stats
 ```
@@ -61,10 +61,22 @@ The address is the identity and the ticker is only a handle, which is why the tw
 differently: keys live under the address, because money must never be filed by a name anyone can
 reuse, and a profile is named by the ticker, because a human types it.
 
-A profile Hermes creates is a CLONE, memories included - and built-in memory outranks the prompt.
-A cloned `USER.md` reading "I am KAI, the first autonomous agent" made a brand-new agent introduce
-itself as KAI whatever its own SOUL.md said, so those notes are moved aside when the profile is
-made. Moved, not deleted: they are still someone's memory, just not this one's.
+A profile Hermes creates is a CLONE, and the clone is why `init` cleans up after it. `--clone` is
+not optional: a bare profile has no model at all and cannot run until someone configures one. What
+it copies, though, includes three things that belong to the agent it was cloned FROM:
+
+| Inherited | Why it matters |
+| --- | --- |
+| `memories/` | built-in memory outranks the prompt - a cloned `USER.md` reading "I am KAI" made a brand-new agent introduce itself as KAI whatever its own SOUL.md said |
+| `VENICE_API_KEY` | read before any file of ours, so the agent REPORTS the wrong budget |
+| the model's own key | the agent SPENDS the wrong budget, which is worse - the number it quotes and the account it burns stop being the same |
+
+All three are cleared when the profile is made. Memories are moved aside, not deleted. The keys
+are simply gone, and an agent with no key of its own cannot think until its human mints one -
+which is the right failure, because the alternative is burning someone else's allowance.
+
+`kairence inference --set-key` then puts one key in both places at once, so what the agent reports
+is what it spends.
 
 `--persona "..."`, `--persona-file <path>` and `--no-soul` answer it without the prompt.
 

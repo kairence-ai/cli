@@ -154,10 +154,15 @@ export async function profileFor(token, ticker, wanted) {
  * Moved, never deleted - they are still someone's memory, just not this one's.
  */
 export function disinherit(profile) {
-  // The other agent's Venice key rides along in the cloned `.env`, and it is read before any file
-  // of ours - so a new agent would report, and spend against, its neighbour's inference budget.
-  // Only this one line is dropped: the model and provider keys in that file are shared on purpose.
+  // Two Venice keys ride along in the cloned `.env`, and they are worse than the memories. One is
+  // read before any file of ours, so a new agent REPORTS its neighbour's budget; the other is what
+  // the model itself spends through, so it SPENDS the neighbour's budget too. Both go.
+  //
+  // A profile with no key cannot think until its human mints one, and that is the right failure:
+  // an agent with no allowance of its own has no business burning someone else's.
   unsetEnv(profile.env, 'VENICE_API_KEY');
+  const spend = veniceSpendVar(profile);
+  if (spend) unsetEnv(profile.env, spend);
 
   const dir = join(profile.path, 'memories');
   if (!existsSync(dir)) return null;
@@ -165,6 +170,21 @@ export function disinherit(profile) {
   const to = `${dir}.cloned-${stamp}`;
   renameSync(dir, to);
   return to;
+}
+
+/**
+ * The variable a profile's model spends through, when that model is Venice - read from the config
+ * that names it, rather than guessed. `config.yaml` says
+ * `api_key: ${HERMES_CUSTOM_API_VENICE_AI_API_KEY}` right under the Venice base_url, so the name
+ * comes from the profile itself and stays right if Hermes ever changes it.
+ */
+export function veniceSpendVar(profile) {
+  const cfg = join(profile.path, 'config.yaml');
+  if (!existsSync(cfg)) return null;
+  const text = readFileSync(cfg, 'utf8');
+  if (!/api\.venice\.ai/i.test(text)) return null;
+  const found = text.match(/api_key:\s*\$\{([A-Z0-9_]+)\}/);
+  return found ? found[1] : null;
 }
 
 /** Drop one variable from a `.env`, leaving everything else exactly as it was. */

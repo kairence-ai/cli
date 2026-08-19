@@ -13,6 +13,7 @@
 import {chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {requireToken} from './chain.mjs';
 import {fileFor} from './home.mjs';
+import {claimOf, hermesProfiles, setEnv, veniceSpendVar} from './harness.mjs';
 import {dirname} from 'node:path';
 
 const RATE_LIMITS = 'https://api.venice.ai/api/v1/api_keys/rate_limits';
@@ -136,6 +137,15 @@ async function setKey(token) {
   mkdirSync(dirname(path), {recursive: true, mode: 0o700});
   writeFileSync(path, `${given}\n`, {mode: 0o600});
   chmodSync(path, 0o600);
+  // The harness spends through this same key, so setting only ours would leave the agent
+  // reporting one budget and burning another - which is exactly the bug this closes.
+  const profile = hermesProfiles().find((p) => claimOf(p)?.toLowerCase() === token.toLowerCase());
+  if (profile) {
+    setEnv(profile.env, 'VENICE_API_KEY', given);
+    const spend = veniceSpendVar(profile);
+    if (spend) setEnv(profile.env, spend, given);
+    console.log(`Also set in the ${profile.name} profile${spend ? `, including what its model spends through` : ''}.`);
+  }
   console.log(`Venice accepts it. Saved to ${path} (readable only by you).`);
   console.log(`You have $${Number(data.balances?.DIEM ?? 0).toFixed(2)} of inference left today.`);
 }

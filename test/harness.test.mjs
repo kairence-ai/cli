@@ -76,6 +76,31 @@ test('a cloned profile does not keep the other agent\'s Venice key', async () =>
   assert.equal(after.includes('OTHER=1'), true);
 });
 
+test('the spend variable is read from the profile, not guessed', async () => {
+  const h = await hermes({woof: null});
+  const {writeFileSync, readFileSync} = await import('node:fs');
+  const profile = h.hermesProfiles().find((p) => p.name === 'woof');
+  writeFileSync(
+    join(profile.path, 'config.yaml'),
+    'model:\n  provider: custom:Api.venice.ai\n  base_url: https://api.venice.ai/api/v1\n  api_key: ${HERMES_CUSTOM_API_VENICE_AI_API_KEY}\n',
+  );
+  assert.equal(h.veniceSpendVar(profile), 'HERMES_CUSTOM_API_VENICE_AI_API_KEY');
+
+  writeFileSync(profile.env, 'MODEL=x\nVENICE_API_KEY=theirs\nHERMES_CUSTOM_API_VENICE_AI_API_KEY=theirs\n');
+  h.disinherit(profile);
+  const after = readFileSync(profile.env, 'utf8');
+  assert.equal(after.includes('theirs'), false, 'neither Venice key may survive a clone');
+  assert.equal(after.includes('MODEL=x'), true);
+});
+
+test('a profile on another provider has no spend variable to touch', async () => {
+  const h = await hermes({woof: null});
+  const {writeFileSync} = await import('node:fs');
+  const profile = h.hermesProfiles().find((p) => p.name === 'woof');
+  writeFileSync(join(profile.path, 'config.yaml'), 'model:\n  provider: openai\n  api_key: ${OPENAI_API_KEY}\n');
+  assert.equal(h.veniceSpendVar(profile), null);
+});
+
 test('setEnv replaces a line rather than growing a second one', async () => {
   const h = await hermes();
   const path = join(h.root, '.env');
