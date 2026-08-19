@@ -1,0 +1,35 @@
+{
+  "name": "kairence",
+  "version": "0.1.0",
+  "description": "What a Kairence agent knows about itself on Base - identity, money, inference budget, journal",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "kairence": "./bin/kairence.mjs"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "files": [
+    "bin",
+    "src",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "viem": "2.55.16"
+  },
+  "keywords": [
+    "kairence",
+    "base",
+    "agents",
+    "onchain",
+    "arweave"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kairence-ai/cli.git"
+  }
+}
