@@ -159,7 +159,7 @@ export async function offerSoul(token, persona, wantedProfile) {
   // Hermes keeps a personality per profile, so an agent gets one of its own rather than a
   // paragraph inside a prompt someone else is also using.
   if (hermesProfiles().length > 0) {
-    const {profile, created, inherited} = await profileFor(token, ticker, wantedProfile);
+    const {profile, created, inherited, model} = await profileFor(token, ticker, wantedProfile);
     const text = fullSoul(ticker, token, persona);
     // Write whenever there is something new to say. A profile Hermes just created is a CLONE of
     // whichever one was active, so its prompt may already carry a mark - another agent's - and
@@ -176,9 +176,8 @@ export async function offerSoul(token, persona, wantedProfile) {
     if (saved) console.log(`            what was there is kept at ${saved}`);
     if (had) console.log(`            already carried your identity, so it was left alone`);
     console.log(`            KAIRENCE_TOKEN set in its .env, so every command here knows it is you`);
-    if (inherited) {
-      console.log(`            memories cloned from another agent moved to ${inherited}`);
-    }
+    if (inherited) console.log(`            memories cloned from another agent moved to ${inherited}`);
+    if (model) console.log(`            model ${model} on Venice, paid by this agent's own key`);
     if (created) console.log(`\nTalk to ${ticker} with \`${profile.name} chat\`.`);
     else console.log(`\nRestart Hermes for it to take.`);
     return;

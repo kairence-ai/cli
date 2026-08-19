@@ -16,6 +16,36 @@ import {dirname, join} from 'node:path';
 
 const HOME = process.env.HOME;
 
+/**
+ * The model a new agent starts on, and the one variable that pays for it.
+ *
+ * We author this rather than cloning it. A clone only works because SOMEONE already configured the
+ * profile it copies - on a fresh machine there is nothing to copy, and on a used one the copy
+ * carries the previous agent's memory and keys. Writing the config ourselves settles both: the
+ * profile is complete from birth, and `key_env` names OUR variable, so an agent's key lives in one
+ * place under one name instead of being the same secret written twice.
+ */
+const VENICE_BASE = 'https://api.venice.ai/api/v1';
+export const DEFAULT_MODEL = 'grok-4-6';
+export const KEY_ENV = 'VENICE_API_KEY';
+
+function profileConfig(model = DEFAULT_MODEL) {
+  return `model:
+  default: ${model}
+  provider: custom:Api.venice.ai
+  base_url: ${VENICE_BASE}
+  api_key: \${${KEY_ENV}}
+  api_mode: chat_completions
+custom_providers:
+  - name: Api.venice.ai
+    base_url: ${VENICE_BASE}
+    key_env: ${KEY_ENV}
+    model: ${model}
+    models:
+      - ${model}
+`;
+}
+
 export function hermesRoot() {
   return process.env.HERMES_HOME || join(HOME, '.hermes');
 }
@@ -125,7 +155,9 @@ export async function profileFor(token, ticker, wanted) {
   }
 
   try {
-    await run('hermes', ['profile', 'create', name, '--clone', '--description', `${ticker}, a Kairence agent`]);
+    // No --clone. A cloned profile inherits the previous agent's memories and keys, and it only
+    // has anything worth inheriting when a human configured that profile by hand.
+    await run('hermes', ['profile', 'create', name, '--description', `${ticker}, a Kairence agent`]);
   } catch (e) {
     if (e.code === 'ENOENT') {
       // No hermes to run. Falling back to whatever profile happens to be here is how two agents
@@ -139,8 +171,10 @@ export async function profileFor(token, ticker, wanted) {
   }
   const made = hermesProfiles().find((p) => p.name === name);
   if (!made) throw new Error(`Hermes reported no profile "${name}" after creating it`);
-  const inherited = disinherit(made);
-  return {profile: made, created: true, inherited};
+  // A profile Hermes makes on its own has no model at all and cannot run. This is the whole of
+  // what it needs, and every line of it is ours.
+  writeFileSync(join(made.path, 'config.yaml'), profileConfig());
+  return {profile: made, created: true, model: DEFAULT_MODEL};
 }
 
 /**
