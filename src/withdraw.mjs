@@ -48,13 +48,13 @@ export async function withdraw(argv) {
   if (amount === 0n) throw new Error('zero is not a withdrawal');
 
   const agentToken = requireToken(bare[2]);
-  const key = readKey();
+  const key = readKey(agentToken);
   if (key === null) {
-    const external = readConfig().externalAccount;
+    const external = readConfig(agentToken).externalAccount;
     throw new Error(
       external
         ? `your account ${external} is held elsewhere - this machine cannot sign, so make the call from wherever that key lives`
-        : `no account key on this machine - run \`kairence init\` (expected ${keyPath()})`,
+        : `no account key for ${agentToken} here - run \`kairence init\` (expected ${keyPath(agentToken)})`,
     );
   }
   const account = privateKeyToAccount(key);

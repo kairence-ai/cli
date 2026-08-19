@@ -11,12 +11,14 @@
 // can list processes.
 
 import {chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
+import {requireToken} from './chain.mjs';
+import {fileFor} from './home.mjs';
 import {dirname} from 'node:path';
 
 const RATE_LIMITS = 'https://api.venice.ai/api/v1/api_keys/rate_limits';
 
-export function venicePath() {
-  return process.env.KAIRENCE_VENICE_KEY_FILE || `${process.env.HOME}/.kairence/venice.key`;
+export function venicePath(token) {
+  return process.env.KAIRENCE_VENICE_KEY_FILE || fileFor(token, 'venice.key');
 }
 
 /**
@@ -24,10 +26,10 @@ export function venicePath() {
  * human for it once and passes it through - must not be overridden by a copy of ours that went
  * stale the day the key was rotated.
  */
-function veniceKey() {
+function veniceKey(token) {
   const fromEnv = process.env.VENICE_API_KEY?.trim();
   if (fromEnv) return {key: fromEnv, where: 'VENICE_API_KEY'};
-  const path = venicePath();
+  const path = venicePath(token);
   if (!existsSync(path)) return null;
   const key = readFileSync(path, 'utf8').trim();
   return key ? {key, where: path} : null;
@@ -119,7 +121,7 @@ function until(iso) {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
-async function setKey() {
+async function setKey(token) {
   const given = process.stdin.isTTY
     ? await askHidden('Paste your Venice inference key (it will not be shown): ')
     : await readStdin();
@@ -130,7 +132,7 @@ async function setKey() {
   // Prove it before storing it. A key saved untested is a key that fails at the moment the agent
   // needed the number, with nothing to say about why.
   const data = await fetchLimits(given);
-  const path = venicePath();
+  const path = venicePath(token);
   mkdirSync(dirname(path), {recursive: true, mode: 0o700});
   writeFileSync(path, `${given}\n`, {mode: 0o600});
   chmodSync(path, 0o600);
@@ -139,10 +141,11 @@ async function setKey() {
 }
 
 export async function inference(argv) {
-  if (argv.includes('--set-key')) return setKey();
+  const token = requireToken(argv.find((a) => !a.startsWith('--')));
+  if (argv.includes('--set-key')) return setKey(token);
 
   const json = argv.includes('--json');
-  const found = veniceKey();
+  const found = veniceKey(token);
   if (!found) {
     throw new Error(
       'no Venice key - run `kairence inference --set-key`, or have your human set VENICE_API_KEY',

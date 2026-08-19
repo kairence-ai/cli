@@ -94,7 +94,7 @@ export async function stats(argv) {
   // Whether the registry's account is the one THIS machine can sign with. The agent cannot tell
   // otherwise, and the two ways it goes wrong - a key rotated but never re-pointed, a registration
   // that never happened - both look exactly like a working setup until something must be signed.
-  const mine = myAddress(readConfig());
+  const mine = myAddress(token, readConfig(token));
   const isMine = Boolean(mine && named && mine.toLowerCase() === account.toLowerCase());
 
   // Round 2 tolerates failure per row: one unwired singleton must not blank the whole report.

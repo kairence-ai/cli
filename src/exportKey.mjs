@@ -13,19 +13,21 @@ import {privateKeyToAccount} from 'viem/accounts';
 import {readConfig} from './config.mjs';
 import {ask, flagValue} from './prompt.mjs';
 import {keyPath, readKey} from './key.mjs';
+import {requireToken} from './chain.mjs';
 
 export async function exportPrivateKey(argv) {
-  const path = keyPath();
+  const token = requireToken(argv.find((a) => !a.startsWith('--')));
+  const path = keyPath(token);
   const out = flagValue(argv, 'out');
   const yes = argv.includes('--yes');
   // `--out` with nothing after it must not quietly become "print it instead".
   if (out === undefined && argv.some((a) => a === '--out' || a.startsWith('--out='))) {
     throw new Error('`--out` needs a file to write to');
   }
-  const key = readKey(path);
+  const key = readKey(token);
 
   if (key === null) {
-    const external = readConfig().externalAccount;
+    const external = readConfig(token).externalAccount;
     throw new Error(
       external
         ? `your account ${external} is held elsewhere - there is no key here to export`

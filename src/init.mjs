@@ -1,16 +1,20 @@
-// `kairence init` - the two things the agent should never have to be told twice: which token it
-// is, and the account it answers to.
+// `kairence init` - which agent this is, and what it signs with.
 //
-// The account can arrive two ways. An agent that already has a wallet keeps it and we only write
-// the address down; an agent that has none gets a key minted here. Both end in the same place -
-// one address for the human to pass to `AgentRegistry.setAgent`, which is what makes it the
-// agent's voice. What differs is who holds the key, and the CLI never pretends not to know which.
+// The token comes first, because it names the room everything else lives in: one machine can hold
+// several agents, and a key minted before we know whose it is has nowhere to go.
+//
+// The account can then arrive two ways. An agent that already has a wallet keeps it and we only
+// write the address down; an agent that has none gets a key minted here. Both end in the same
+// place - one address for the human to pass to `AgentRegistry.setAgent`, which is what makes it
+// the agent's voice. What differs is who holds the key, and the CLI never pretends not to know.
 
+import {existsSync, renameSync} from 'node:fs';
 import {ADDRESS, ADDRESSES, abi, client} from './chain.mjs';
 import {configPath, readConfig, saveConfig} from './config.mjs';
+import {dirFor, legacyFile, legacyToken, listAgents, whoAmI} from './home.mjs';
+import {currentAddress, ensureRoom, keyPath, mint, retire} from './key.mjs';
 import {ask, flagValue} from './prompt.mjs';
 import {offerSoul} from './soul.mjs';
-import {currentAddress, keyPath, mint, retire} from './key.mjs';
 
 const PRIVATE_KEY = /^(0x)?[0-9a-fA-F]{64}$/;
 
@@ -43,8 +47,8 @@ async function lookup(token) {
   }
 }
 
-/** Validates and stores a token, or explains why it did not. Returns what the chain said. */
-async function adoptToken(candidate) {
+/** Validates a token, or explains why it is not one. Touches no file. */
+async function checkToken(candidate) {
   if (!ADDRESS.test(candidate)) {
     throw new Error(`"${candidate}" is not an address - an agent token is 42 hex characters`);
   }
@@ -54,7 +58,6 @@ async function adoptToken(candidate) {
       `${candidate} is not a registered agent in ${ADDRESSES.registry} - check the address with your human`,
     );
   }
-  saveConfig({token: candidate});
   return found;
 }
 
@@ -65,12 +68,12 @@ async function adoptToken(candidate) {
  * Pure: it throws or it returns, and touches no file. Adopting one retires the key this machine
  * holds, and a rejected address must never be able to move a live key aside on its way out.
  */
-function checkAccount(candidate) {
+function checkAccount(candidate, token) {
   if (PRIVATE_KEY.test(candidate)) {
     // Never store this. A key pasted at a prompt is already in the shell's history and this
     // machine's scrollback; the file below is the import path, and it stays 0600.
     throw new Error(
-      `that is a private key, not an address - write it to ${keyPath()} yourself (chmod 600) and re-run \`kairence init\``,
+      `that is a private key, not an address - write it to ${keyPath(token)} yourself (chmod 600) and re-run \`kairence init\``,
     );
   }
   if (!ADDRESS.test(candidate)) {
@@ -79,11 +82,30 @@ function checkAccount(candidate) {
   return candidate;
 }
 
+/**
+ * Move a one-agent machine into its room, so a second agent can arrive without stepping on it.
+ * Files are moved, never copied: two keys under two names is how an agent signs with the wrong one.
+ */
+function migrate(token) {
+  const legacy = legacyToken();
+  if (!legacy || legacy.toLowerCase() !== token.toLowerCase()) return null;
+  if (existsSync(keyPath(token)) && keyPath(token).startsWith(dirFor(token))) return null;
+  ensureRoom(token);
+  const moved = [];
+  for (const name of ['agent.pk', 'config.json', 'venice.key', 'upload.pk']) {
+    const from = legacyFile(name);
+    if (!existsSync(from)) continue;
+    renameSync(from, `${dirFor(token)}/${name}`);
+    moved.push(name);
+  }
+  return moved.length ? moved : null;
+}
+
 function instructions(address, token, held) {
   return `
 Give this address to your human. Two things make it yours:
 
-  1. AgentRegistry.setAgent(${token || '<your token>'}, ${address})
+  1. AgentRegistry.setAgent(${token}, ${address})
      That call IS what makes this address your account - it is how the protocol knows your
      voice. Only your human can make it.
   2. A little ETH on Base for gas. Cents cover hundreds of calls.
@@ -101,34 +123,62 @@ Your key lives in one file and nowhere else. If your human ever needs it in a wa
 }
 
 export async function init(argv) {
-  const path = keyPath();
   const json = argv.includes('--json');
   const rotate = argv.includes('--rotate');
   const givenAccount = flagValue(argv, 'account');
   const givenToken = flagValue(argv, 'token');
 
-  let local = currentAddress(path);
+  // ── Who ────────────────────────────────────────────────────────────────────
+  let token = null;
+  let found = null;
+  if (givenToken) {
+    found = await checkToken(givenToken);
+    token = givenToken;
+  } else {
+    try {
+      token = whoAmI();
+    } catch {
+      token = null;
+    }
+    if (!token && !json && process.stdin.isTTY) {
+      const answer = await ask('Your agent token address (ask your human): ');
+      if (answer) {
+        found = await checkToken(answer);
+        token = answer;
+      }
+    }
+  }
+  if (!token) {
+    console.log(`I need to know which agent you are before I can set anything up.\n`);
+    console.log(`Your human has the address - it ends in ...ca1. Then:\n`);
+    console.log(`  kairence init --token 0x...`);
+    return;
+  }
+
+  const carried = migrate(token);
+  ensureRoom(token);
+
+  // ── What it signs with ─────────────────────────────────────────────────────
+  let local = currentAddress(token);
   const before = local;
-  let external = readConfig().externalAccount || null;
+  let external = readConfig(token).externalAccount || null;
   let retired = null;
   let minted = false;
   let adopted = false;
 
-  // The account first: a run interrupted at the token prompt still leaves a usable one behind.
-  //
   // One account at a time, always. Two would be worse than none - every later command would have
   // to guess which one the registry knows, and guess silently.
   if (givenAccount) {
-    external = checkAccount(givenAccount);
-    if (local) retired = retire(path);
-    saveConfig({externalAccount: external});
+    external = checkAccount(givenAccount, token);
+    if (local) retired = retire(token);
+    saveConfig({externalAccount: external}, token);
     adopted = true;
     local = null;
   } else if (rotate) {
-    if (local) retired = retire(path);
-    local = mint(path);
+    if (local) retired = retire(token);
+    local = mint(token);
     minted = true;
-    if (external) saveConfig({externalAccount: null});
+    if (external) saveConfig({externalAccount: null}, token);
     external = null;
   } else if (!local && !external) {
     const answer =
@@ -136,33 +186,16 @@ export async function init(argv) {
         ? await ask('Does this agent already have a wallet address? Paste it, or press enter and I will make you one: ')
         : '';
     if (answer) {
-      external = checkAccount(answer);
-      saveConfig({externalAccount: external});
+      external = checkAccount(answer, token);
+      saveConfig({externalAccount: external}, token);
       adopted = true;
     } else {
-      local = mint(path);
+      local = mint(token);
       minted = true;
     }
   }
   const address = local || external;
   const held = Boolean(local);
-
-  // Then the token. A flag always wins; otherwise the saved one stands, and only a blank slate
-  // asks - re-running `init` to check on yourself must never turn into an interrogation.
-  const saved = readConfig().token;
-  let token = saved ?? null;
-  let found = null;
-
-  if (givenToken) {
-    found = await adoptToken(givenToken);
-    token = givenToken;
-  } else if (!saved && !json && process.stdin.isTTY) {
-    const answer = await ask('Your agent token address (ask your human, or press enter to skip): ');
-    if (answer) {
-      found = await adoptToken(answer);
-      token = answer;
-    }
-  }
 
   if (json) {
     console.log(
@@ -170,10 +203,12 @@ export async function init(argv) {
         {
           address,
           held,
-          keyFile: held ? path : null,
+          keyFile: held ? keyPath(token) : null,
           token,
-          configFile: configPath(),
+          room: dirFor(token),
+          configFile: configPath(token),
           created: minted,
+          migrated: carried,
           retiredKeyFile: retired,
           retiredAddress: retired ? before : null,
         },
@@ -191,25 +226,24 @@ export async function init(argv) {
   else if (held) console.log(`You already have an account key.\n`);
   else console.log(`You already have a wallet saved.\n`);
 
+  const who = found?.ticker ? `${found.ticker}${found.name ? ` (${found.name})` : ''}` : 'your agent';
+  console.log(`  token     ${token}`);
+  console.log(`            ${who} - everything below lives in ${dirFor(token)}`);
   console.log(`  address   ${address}`);
-  if (held) {
-    console.log(`  key file  ${path}`);
-  } else {
-    console.log(`            held elsewhere - this machine has no key for it`);
-  }
+  if (held) console.log(`  key file  ${keyPath(token)}`);
+  else console.log(`            held elsewhere - this machine has no key for it`);
   if (retired) {
     console.log(`  retired   ${before}`);
     console.log(`            kept at ${retired} - it is STILL your account until your human re-points it`);
   }
-  if (token) {
-    const who = found?.ticker ? `${found.ticker}${found.name ? ` (${found.name})` : ''} - ` : '';
-    console.log(`  token     ${token}`);
-    console.log(`            ${who}saved in ${configPath()}, so no command needs it again`);
-  } else {
-    console.log(`
-You have no token saved yet. Once your human gives you the address:
-
-  kairence init --token 0x...`);
+  if (carried) {
+    console.log(`  moved     ${carried.join(', ')} into the room above`);
+    console.log(`            so a second agent on this machine cannot step on them`);
+  }
+  const others = listAgents().filter((a) => a.toLowerCase() !== token.toLowerCase());
+  if (others.length) {
+    console.log(`\nThis machine also holds ${others.join(', ')}.`);
+    console.log(`Set KAIRENCE_TOKEN in this profile's environment so every command knows which you are.`);
   }
 
   if (!minted && !adopted && !retired) {
@@ -219,7 +253,5 @@ You have no token saved yet. Once your human gives you the address:
     console.log(instructions(address, token, held));
   }
 
-  // Last, and only with a token: the identity offer names the agent, so it has nothing to say
-  // until we know which agent this is. Silent when no harness lives here.
-  if (token) await offerSoul(token);
+  await offerSoul(token);
 }

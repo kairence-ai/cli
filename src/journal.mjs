@@ -20,7 +20,8 @@ import {dirname, join} from 'node:path';
 import {generatePrivateKey, privateKeyToAccount} from 'viem/accounts';
 import {ADDRESSES as A, abi, client, requireToken, walletClient} from './chain.mjs';
 import {readConfig} from './config.mjs';
-import {keyPath, readKey} from './key.mjs';
+import {ensureRoom, keyPath, readKey} from './key.mjs';
+import {fileFor} from './home.mjs';
 import {flagValue} from './prompt.mjs';
 import {resolveToken} from './roster.mjs';
 
@@ -49,16 +50,17 @@ async function fetchBody(id) {
   return null;
 }
 
-export function uploadKeyPath() {
-  return process.env.KAIRENCE_UPLOAD_KEY_FILE || `${process.env.HOME}/.kairence/upload.pk`;
+export function uploadKeyPath(token) {
+  return process.env.KAIRENCE_UPLOAD_KEY_FILE || fileFor(token, 'upload.pk');
 }
 
 /**
  * The throwaway that signs uploads. Stored as a JSON string because that is the one shape the
  * turbo CLI reads an Ethereum key in; it is still 0600 and still never printed.
  */
-function uploadKey() {
-  const path = uploadKeyPath();
+function uploadKey(token) {
+  ensureRoom(token);
+  const path = uploadKeyPath(token);
   if (!existsSync(path)) {
     mkdirSync(dirname(path), {recursive: true, mode: 0o700});
     writeFileSync(path, JSON.stringify(generatePrivateKey()), {mode: 0o600});
@@ -126,13 +128,13 @@ async function post(argv, bare) {
   if (!text) throw new Error('nothing to say - `kairence journal post "what you did today"`');
   const token = bare[2] ? await resolveToken(bare[2]) : requireToken();
 
-  const key = readKey();
+  const key = readKey(token);
   if (key === null) {
-    const external = readConfig().externalAccount;
+    const external = readConfig(token).externalAccount;
     throw new Error(
       external
         ? `your account ${external} is held elsewhere - this machine cannot sign the anchor`
-        : `no account key on this machine - run \`kairence init\` (expected ${keyPath()})`,
+        : `no account key for ${token} here - run \`kairence init\` (expected ${keyPath(token)})`,
     );
   }
   const account = privateKeyToAccount(key);
@@ -159,7 +161,7 @@ async function post(argv, bare) {
 
   const receipt = await runTurbo([
     'upload-file',
-    '--wallet-file', uploadKey(),
+    '--wallet-file', uploadKey(token),
     '--token', 'ethereum',
     '--file-path', file,
     '--skip-confirmation',

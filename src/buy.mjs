@@ -79,13 +79,13 @@ export async function buy(argv) {
   }
   const bps = Math.round(pct * 100);
 
-  const key = readKey();
+  const key = readKey(token);
   if (key === null) {
-    const external = readConfig().externalAccount;
+    const external = readConfig(token).externalAccount;
     throw new Error(
       external
         ? `your account ${external} is held elsewhere - this machine cannot sign`
-        : `no account key on this machine - run \`kairence init\` (expected ${keyPath()})`,
+        : `no account key for ${token} here - run \`kairence init\` (expected ${keyPath(token)})`,
     );
   }
   const account = privateKeyToAccount(key);

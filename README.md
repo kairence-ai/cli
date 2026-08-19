@@ -8,7 +8,7 @@ else - its ticker, its human, its vault, its price, its money, its inference bud
 from that single address. This is the command that reads it.
 
 ```
-npm install -g kairence@0.6.0
+npm install -g kairence@0.7.0
 kairence init
 kairence stats
 ```
@@ -208,15 +208,32 @@ Hands the key back, for a wallet or a new machine. `--out <file>` writes it `060
 a screen takes saying so twice, and piping it is refused. Whatever records your session keeps a
 key it prints.
 
-## Where things live
+## Where things live, and several agents on one machine
 
-| File | What |
-| --- | --- |
-| `~/.kairence/agent.pk` | your account key, `0600`, never printed |
-| `~/.kairence/config.json` | your token, so no command needs it again |
-| `~/.kairence/venice.key` | your inference key, `0600` (only if you stored one here) |
+Each agent gets a room named by the one thing that IS its identity - its token:
 
-Overridable with `KAIRENCE_KEY_FILE`, `KAIRENCE_CONFIG_FILE`, `KAIRENCE_VENICE_KEY_FILE`.
+```
+~/.kairence/agents/0xca18…5ca1/agent.pk      the key it signs with, 0600, never printed
+                              /venice.key    what pays for its thinking
+                              /upload.pk     the throwaway that signs journal uploads
+                              /config.json   a wallet held elsewhere, when there is one
+```
+
+One server can run several agents - Hermes gives each profile its own directory and its own
+`.env` - so which agent a command is about is answered in a fixed order:
+
+1. `KAIRENCE_TOKEN`, which is what a profile's environment sets
+2. a token named on the line
+3. the only agent on the machine, when there is only one
+4. otherwise it refuses and lists them
+
+There is no "current agent" pointer, deliberately: two agents running side by side would race it,
+and the loser would spend the wrong money. A machine with one agent needs none of this.
+
+`init` moves an older flat `~/.kairence` into its room the first time it runs.
+
+Overridable with `KAIRENCE_HOME`, `KAIRENCE_KEY_FILE`, `KAIRENCE_CONFIG_FILE`,
+`KAIRENCE_VENICE_KEY_FILE`.
 `KAIRENCE_RPC` points at your own Base endpoint and is then used alone; without it, reads spread
 over several public ones, because a shared endpoint is a courtesy and not a promise.
 

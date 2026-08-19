@@ -6,7 +6,7 @@
 
 import {createPublicClient, createWalletClient, fallback, http, parseAbi} from 'viem';
 import {base} from 'viem/chains';
-import {readConfig} from './config.mjs';
+import {whoAmI} from './home.mjs';
 
 export const ADDRESSES = {
   registry: '0xf6df07b5a8E39F90672859736b11418641F587BE',
@@ -129,12 +129,9 @@ export const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
  * the config; with nothing on the line, the agent's own token stands in.
  */
 export function requireToken(value) {
-  const token = value || process.env.KAIRENCE_TOKEN || readConfig().token;
-  if (!token) {
-    throw new Error('no agent token - run `kairence init` once and it will remember yours');
+  if (!value) return whoAmI();
+  if (!ADDRESS.test(value)) {
+    throw new Error(`"${value}" is not an address - an agent token is 42 hex characters`);
   }
-  if (!ADDRESS.test(token)) {
-    throw new Error(`"${token}" is not an address - an agent token is 42 hex characters`);
-  }
-  return token;
+  return value;
 }
