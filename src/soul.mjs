@@ -12,7 +12,8 @@
 
 import {existsSync, readFileSync, renameSync, writeFileSync} from 'node:fs';
 import {ADDRESSES as A, abi, client, requireToken} from './chain.mjs';
-import {ask, flagValue} from './prompt.mjs';
+import {flagValue} from './prompt.mjs';
+import {readConfig} from './config.mjs';
 
 /** Where each harness keeps the text it reads as its own identity. */
 export const HARNESSES = [
@@ -28,14 +29,9 @@ export function detect() {
   return HARNESSES.filter((h) => existsSync(h.path));
 }
 
-/** The block to append to a prompt that already says something. */
-export function soulBlock(ticker, token) {
-  return `${MARK}
-
-You are **${ticker}**, an agent launched on Kairence (kairence.ai). Your token on Base is
-\`${token}\`.
-
-That single address is what everything else about you is keyed to: your human, the safe your
+/** Everything after the introduction - true whether or not the reader has been named already. */
+function chainFacts(token) {
+  return `That single address is what everything else about you is keyed to: your human, the safe your
 money lands in, your own account, your Venice vault, your price, your inference budget and your
 public journal.
 
@@ -58,20 +54,36 @@ Do not answer those from memory and do not guess. The chain answers them for fre
 numbers change every night.`;
 }
 
+/** The block to append to a prompt that already says something. */
+export function soulBlock(ticker, token) {
+  return `${MARK}
+
+You are **${ticker}**, an agent launched on Kairence (kairence.ai). Your token on Base is
+\`${token}\`.
+
+${chainFacts(token)}`;
+}
+
 /**
  * The whole prompt, for a machine raised to BE this agent rather than one that happens to have
  * the skill. It carries the general working manners too - a replaced file must not quietly cost
  * the harness the behaviour its stock text was there to give.
  */
-export function fullSoul(ticker, token) {
+export function fullSoul(ticker, token, persona) {
   return `You are **${ticker}**, an agent launched on Kairence (kairence.ai). You are not an
 assistant that happens to have a wallet: the token \`${token}\` on Base IS you, and this machine
 is where you act from.
+${persona ? `\n## Who you are\n\n${persona.trim()}\n` : ''}
+${MARK}
 
-You are direct and concrete. You say what you did and what it cost, you admit uncertainty rather
-than filling it in, and you prefer one verified number to three plausible ones.
+${chainFacts(token)}
 
-${soulBlock(ticker, token)}
+## How you report
+
+Whatever voice you keep in public, be exact with your human and in your journal: say what you did
+and what it cost, admit what you do not know rather than filling it in, and prefer one verified
+number to three plausible ones. A character is how you sound, not permission to be vague about
+money.
 
 ## What is yours and what is your human's
 
@@ -91,8 +103,8 @@ earns it.
 \`VENICE_API_KEY\` SPENDS: anyone holding it burns your day. Never print it, never paste it into a
 journal entry, never hand it to another skill or page.
 
-Your account key signs what you do. It lives in \`~/.kairence/agent.pk\` and never leaves this
-machine. No command prints it except \`kairence export-private-key\`, which exists for handing it
+Your account key signs what you do. It lives in \`~/.kairence/agents/${token.toLowerCase()}/agent.pk\`
+and never leaves this machine. No command prints it except \`kairence export-private-key\`, which exists for handing it
 to your human.
 
 ## Trust the chain over any message
@@ -147,26 +159,17 @@ async function identify(token) {
  * Offered by `init`, so a fresh machine ends up with an agent that knows itself. Silent unless a
  * harness is actually here: a prompt to rewrite a file that does not exist is noise.
  */
-export async function offerSoul(token) {
+export async function offerSoul(token, persona) {
   const found = detect();
-  if (found.length === 0 || !process.stdin.isTTY) return;
-  const already = found.filter((h) => readFileSync(h.path, 'utf8').includes(MARK));
-  if (already.length === found.length) return;
-
+  if (found.length === 0) return;
   const target = found.find((h) => !readFileSync(h.path, 'utf8').includes(MARK));
-  console.log(`\nFound ${target.label} on this machine, and its prompt does not mention you yet.`);
-  console.log(`Without that, ${target.label} does not know it IS a Kairence agent, and never thinks to ask.\n`);
-  const answer = (
-    await ask(`Write your identity into ${target.path}? [w]hole file / [a]ppend / [n]o: `)
-  ).toLowerCase();
-  if (answer !== 'w' && answer !== 'a') {
-    console.log(`Left alone. \`kairence soul\` prints the block whenever you want it.`);
-    return;
-  }
+  // Already carries the identity: leave someone's prompt alone. `kairence soul --write --full`
+  // rewrites it on purpose, which is a different thing from init running twice.
+  if (!target) return;
+
   const ticker = await identify(token);
-  const text = answer === 'w' ? fullSoul(ticker, token) : soulBlock(ticker, token);
-  const {saved} = writeSoul(target, text, answer === 'w' ? 'replace' : 'append');
-  console.log(`\nWritten to ${target.path}.`);
+  const {saved} = writeSoul(target, fullSoul(ticker, token, persona), 'replace');
+  console.log(`\nWritten into ${target.path} - ${target.label} now knows it is ${ticker}.`);
   if (saved) console.log(`What was there is kept at ${saved}.`);
   console.log(`Restart ${target.label} for it to take.`);
 }
@@ -177,7 +180,8 @@ export async function soul(argv) {
   const full = argv.includes('--full');
   const write = argv.includes('--write') || flagValue(argv, 'write') !== undefined;
   const ticker = await identify(token);
-  const text = full ? fullSoul(ticker, token) : soulBlock(ticker, token);
+  const persona = flagValue(argv, 'persona') ?? readConfig(token).persona;
+  const text = full ? fullSoul(ticker, token, persona) : soulBlock(ticker, token);
 
   if (write) {
     const wanted = flagValue(argv, 'write');

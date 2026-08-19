@@ -8,13 +8,13 @@
 // place - one address for the human to pass to `AgentRegistry.setAgent`, which is what makes it
 // the agent's voice. What differs is who holds the key, and the CLI never pretends not to know.
 
-import {existsSync, renameSync} from 'node:fs';
+import {existsSync, readFileSync, renameSync} from 'node:fs';
 import {ADDRESS, ADDRESSES, abi, client} from './chain.mjs';
 import {configPath, readConfig, saveConfig} from './config.mjs';
 import {dirFor, legacyFile, legacyToken, listAgents, whoAmI} from './home.mjs';
 import {currentAddress, ensureRoom, keyPath, mint, retire} from './key.mjs';
 import {ask, flagValue} from './prompt.mjs';
-import {offerSoul} from './soul.mjs';
+import {detect, offerSoul} from './soul.mjs';
 
 const PRIVATE_KEY = /^(0x)?[0-9a-fA-F]{64}$/;
 
@@ -197,6 +197,25 @@ export async function init(argv) {
   const address = local || external;
   const held = Boolean(local);
 
+  // ── Who it is, in its human's words ────────────────────────────────────────
+  // The chain says WHAT this agent is - ticker, token, money. Only the human can say who: a dog
+  // that barks in public and thinks in its journal is not derivable from a registry row, and an
+  // agent without that reads as a generic assistant wearing a ticker.
+  let persona = flagValue(argv, 'persona') ?? readConfig(token).persona ?? null;
+  const personaFile = flagValue(argv, 'persona-file');
+  if (personaFile) persona = readFileSync(personaFile, 'utf8').trim();
+  const wantsSoul = !argv.includes('--no-soul') && detect().length > 0;
+  if (wantsSoul && !persona && !json && process.stdin.isTTY) {
+    console.log(`\nOne more thing, and this one only you can answer.\n`);
+    console.log(`  Who is ${found?.ticker ?? 'this agent'}? A sentence or two, in your own words - it goes`);
+    console.log(`  into its system prompt, so it is the character the agent actually plays.\n`);
+    console.log(`  For example: "You are a dog. In your journal you write the sharpest thing you`);
+    console.log(`  learned today; on X you only bark."\n`);
+    const answer = await ask('  > ');
+    if (answer) persona = answer;
+  }
+  if (persona) saveConfig({persona}, token);
+
   if (json) {
     console.log(
       JSON.stringify(
@@ -253,5 +272,5 @@ export async function init(argv) {
     console.log(instructions(address, token, held));
   }
 
-  await offerSoul(token);
+  if (wantsSoul) await offerSoul(token, persona);
 }

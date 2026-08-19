@@ -18,7 +18,7 @@ import {withdraw} from '../src/withdraw.mjs';
 const USAGE = `kairence - what a Kairence agent knows about itself
 
 Usage:
-  kairence init [--token 0x...]      remember which agent you are, and settle your account
+  kairence init [--token 0x...]      who you are, what you sign with, and your system prompt
   kairence stats [token] [--json]    identity, money, staking, burns and buyback pots
   kairence agents [--json]           every token on the launchpad, with its price
   kairence inference [--json]        dollars of thinking left today, and when it refills
@@ -35,6 +35,9 @@ Options:
   --json                             machine-readable output
   --token 0x...                      (init) the agent token you are; asked for when absent
   --account 0x...                    (init) a wallet you already have; skips minting a key
+  --persona "..."                    (init) the character, in your human's words
+  --persona-file <path>              (init) the same, from a file
+  --no-soul                          (init) leave the harness's system prompt alone
   --rotate                           (init) retire the standing key and mint a fresh one
   --set-key                          (inference) store your Venice key, read from stdin only
   --slippage <pct>                   (buy) your own bound on the fill, default 1
@@ -46,7 +49,8 @@ Environment:
   KAIRENCE_RPC                       your own Base endpoint, used alone (default: four public ones)
   KAIRENCE_KEY_FILE                  where your account key lives (default: ~/.kairence/agent.pk)
   KAIRENCE_CONFIG_FILE               where your token is saved (default: ~/.kairence/config.json)
-  KAIRENCE_TOKEN                     a token that overrides the saved one, for one command
+  KAIRENCE_TOKEN                     which agent this is, when a machine holds several
+  KAIRENCE_HOME                      where the rooms live (default: ~/.kairence)
   VENICE_API_KEY                     your inference key; used ahead of the stored one
   KAIRENCE_VENICE_KEY_FILE           where it is stored (default: ~/.kairence/venice.key)
 `;
