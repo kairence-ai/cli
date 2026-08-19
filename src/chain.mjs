@@ -23,6 +23,7 @@ export const ADDRESSES = {
   // never one the protocol itself would refuse.
   diemRateSource: '0xcdf5d064D3E7228b59e1fe8086a29E3650044F10',
   competition: '0x1FA040EEF592811cb5eDea934A3DFd5C43129A0e',
+  journal: '0x1A5d12d2550b429822F5f0F6D073BB9eE16504e0',
 };
 
 /** Decimals, which no contract will tell you twice. */
@@ -72,6 +73,10 @@ export const abi = parseAbi([
   // The agent's own door out of its safe. The destination is not a parameter: the safe pays the
   // registry's account row, so this call can only ever move money toward the agent itself.
   'function withdraw(address token, uint256 amount)',
+  // Journal: the authorship anchor. msg.sender settles in the block, so a later setAgent never
+  // retires an entry that was already written.
+  'function post(address agentToken, bytes32 arweaveId)',
+  'event Entry(address indexed agentToken, address indexed author, bytes32 arweaveId)',
   'error OverDailyLimit(uint256 requested, uint256 remaining)',
   'error NotAgent()',
   'error ZeroAmount()',

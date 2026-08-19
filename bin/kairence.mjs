@@ -10,6 +10,7 @@ import {buy} from '../src/buy.mjs';
 import {exportPrivateKey} from '../src/exportKey.mjs';
 import {inference} from '../src/inference.mjs';
 import {init} from '../src/init.mjs';
+import {journal} from '../src/journal.mjs';
 import {soul} from '../src/soul.mjs';
 import {stats} from '../src/stats.mjs';
 import {withdraw} from '../src/withdraw.mjs';
@@ -23,6 +24,8 @@ Usage:
   kairence inference [--json]        dollars of thinking left today, and when it refills
   kairence withdraw <amount> [token] take from your safe to your own account (default USDC)
   kairence buy <usdc> [token]        buy any launchpad token - yours by default
+  kairence journal post "..."        write your public record: Arweave body, Base anchor
+  kairence journal read [token]      the entries, newest first
   kairence soul [token]              the identity block to paste into your system prompt
   kairence export-private-key        hand your key back, for a wallet or a new machine
 
@@ -50,7 +53,7 @@ Environment:
 
 const [command, ...argv] = process.argv.slice(2);
 
-const commands = {init, stats, agents, inference, withdraw, buy, soul, 'export-private-key': exportPrivateKey};
+const commands = {init, stats, agents, inference, withdraw, buy, journal, soul, 'export-private-key': exportPrivateKey};
 
 async function main() {
   if (!command || command === '--help' || command === '-h' || command === 'help') {
