@@ -64,6 +64,18 @@ test('a name asked for explicitly is never quietly changed', async () => {
   await assert.rejects(() => h.profileFor(WOOF, 'WOOF', 'mine'), /already belongs to/);
 });
 
+test('a cloned profile does not keep the other agent\'s Venice key', async () => {
+  const h = await hermes({woof: null});
+  const {writeFileSync, readFileSync} = await import('node:fs');
+  const profile = h.hermesProfiles().find((p) => p.name === 'woof');
+  writeFileSync(profile.env, 'MODEL=glm\nVENICE_API_KEY=someone-elses\nOTHER=1\n');
+  h.disinherit(profile);
+  const after = readFileSync(profile.env, 'utf8');
+  assert.equal(after.includes('VENICE_API_KEY'), false, 'the inherited key must be gone');
+  assert.equal(after.includes('MODEL=glm'), true, 'shared config must survive');
+  assert.equal(after.includes('OTHER=1'), true);
+});
+
 test('setEnv replaces a line rather than growing a second one', async () => {
   const h = await hermes();
   const path = join(h.root, '.env');

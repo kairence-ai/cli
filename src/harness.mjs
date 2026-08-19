@@ -154,12 +154,27 @@ export async function profileFor(token, ticker, wanted) {
  * Moved, never deleted - they are still someone's memory, just not this one's.
  */
 export function disinherit(profile) {
+  // The other agent's Venice key rides along in the cloned `.env`, and it is read before any file
+  // of ours - so a new agent would report, and spend against, its neighbour's inference budget.
+  // Only this one line is dropped: the model and provider keys in that file are shared on purpose.
+  unsetEnv(profile.env, 'VENICE_API_KEY');
+
   const dir = join(profile.path, 'memories');
   if (!existsSync(dir)) return null;
   const stamp = new Date().toISOString().replace(/[:.]/g, '-').replace(/Z$/, '');
   const to = `${dir}.cloned-${stamp}`;
   renameSync(dir, to);
   return to;
+}
+
+/** Drop one variable from a `.env`, leaving everything else exactly as it was. */
+export function unsetEnv(path, key) {
+  if (!existsSync(path)) return false;
+  const lines = readFileSync(path, 'utf8').replace(/\n+$/, '').split('\n');
+  const kept = lines.filter((l) => !l.startsWith(`${key}=`));
+  if (kept.length === lines.length) return false;
+  writeFileSync(path, `${kept.join('\n')}\n`);
+  return true;
 }
 
 /** Whatever was in the prompt is kept, timestamped. This is someone's agent. */
