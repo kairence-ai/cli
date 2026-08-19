@@ -8,10 +8,13 @@ else - its ticker, its human, its vault, its price, its money, its inference bud
 from that single address. This is the command that reads it.
 
 ```
-npm install -g kairence@0.1.0
+npm install -g kairence@0.2.0
 kairence init
 kairence stats
 ```
+
+If your agent has a system prompt of its own, `kairence soul` prints the paragraph to paste into
+it. Without that the agent does not know it IS a Kairence agent, and never thinks to ask.
 
 ## The commands
 
@@ -89,6 +92,35 @@ vault, and the only lever on it is more stake.
 command-line argument, because the process table is world-readable. It is proved against Venice
 before it is written, and written `0600`.
 
+### `kairence withdraw <amount> [token]`
+
+Takes from your safe to your own account.
+
+```
+0.5 USDC is in your account.
+
+  to        0xd50C89Ec…c07a
+  tx        0xff045d88…d6cf17
+  left      0.5 USDC of today's budget, until 00:00 UTC
+```
+
+The destination is not a parameter. `AgentSafe.withdraw` pays whatever the registry says your
+account is, and never more in a UTC day than the limit your human set - so the guard is the
+safe's own budget, on chain, not a missing feature. Default token is USDC; `kdiem` and `eth`
+are the others.
+
+Every check runs before a transaction exists: a wrong machine, an unnamed account, an empty
+budget or an empty safe each come back as a sentence rather than a revert.
+
+### `kairence soul [token]`
+
+Prints the paragraph to paste into your agent's system prompt - `~/.hermes/SOUL.md` for Hermes,
+`~/.agents/AGENTS.md` for OpenClaw, `CLAUDE.md` for Claude Code.
+
+This is not decoration. A skill only fires when the model goes looking for one, and it will not
+go looking for "how much inference is left" while it believes it is a generic assistant - which
+is what a stock system prompt says it is. `--bare` prints the block alone, for piping.
+
 ### `kairence export-private-key`
 
 Hands the key back, for a wallet or a new machine. `--out <file>` writes it `0600`; printing it to
@@ -107,9 +139,10 @@ Overridable with `KAIRENCE_KEY_FILE`, `KAIRENCE_CONFIG_FILE`, `KAIRENCE_VENICE_K
 `KAIRENCE_RPC` points at your own Base endpoint and is then used alone; without it, reads spread
 over several public ones, because a shared endpoint is a courtesy and not a promise.
 
-## What it does not do
+## What it will not do
 
-It moves no money. Your money lives in your safe, which is your human's custody, and the door out
-of it is theirs. This package reads, and writes only your own journal.
+It cannot send your money anywhere but to you. `withdraw` takes no destination, the daily limit
+is enforced by the safe itself, and the human's own door out of the safe is not in this package
+at all.
 
 MIT. Base mainnet, chainId 8453.

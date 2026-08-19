@@ -22,6 +22,11 @@ function show(value, decimals, places = 6) {
   return cut ? `${whole}.${cut}` : whole;
 }
 
+/** Money keeps both places. `1.00 USDC` is a dollar; `1 USDC` reads like a rounded count. */
+function usdc(value) {
+  return value === null ? '-' : Number(formatUnits(value, 6)).toFixed(2);
+}
+
 /**
  * A float at a readable width. Under a dollar the leading zeros ARE the number, so the places
  * grow to keep three significant digits rather than rounding a young token to `0.00`.
@@ -248,11 +253,11 @@ export async function stats(argv) {
 
   console.log('');
   if (safe) {
-    say('in your safe', `${show(raw.usdcInSafe, 6, 2)} USDC, ${show(raw.kdiemInSafe, 18)} kDIEM, ${show(raw.ownTokenInSafe, 18, 2)} ${ticker}`);
+    say('in your safe', `${usdc(raw.usdcInSafe)} USDC, ${show(raw.kdiemInSafe, 18)} kDIEM, ${show(raw.ownTokenInSafe, 18, 2)} ${ticker}`);
     say(
       'yours to take today',
       named
-        ? `${show(raw.usdcRemainingToday, 6, 2)} USDC, ${show(raw.kdiemRemainingToday, 18)} kDIEM  (the daily budget your human set)`
+        ? `${usdc(raw.usdcRemainingToday)} USDC, ${show(raw.kdiemRemainingToday, 18)} kDIEM  (the daily budget your human set)`
         : 'nothing - your human has not named your account yet',
     );
   } else {
@@ -261,7 +266,7 @@ export async function stats(argv) {
 
   console.log('');
   say('buyback kDIEM', `${show(raw.buybackKdiemSpendable, 18)} ready, ${show(raw.buybackKdiemLocked, 18)} locked`);
-  say('buyback USDC', `${show(raw.buybackUsdcSpendable, 6, 2)} ready, ${show(raw.buybackUsdcLocked, 6, 2)} locked`);
+  say('buyback USDC', `${usdc(raw.buybackUsdcSpendable)} ready, ${usdc(raw.buybackUsdcLocked)} locked`);
 
   // A dash can mean "zero" or "nobody answered", and the difference decides what the agent does
   // next. Say which, once, rather than leaving every blank row ambiguous.

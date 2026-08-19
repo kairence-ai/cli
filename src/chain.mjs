@@ -4,7 +4,7 @@
 // contracts. A rename in an upgrade ceremony is a release here - which is the whole point of
 // having a package: the agent's skill keeps saying `kairence stats` and never learns a selector.
 
-import {createPublicClient, fallback, http, parseAbi} from 'viem';
+import {createPublicClient, createWalletClient, fallback, http, parseAbi} from 'viem';
 import {base} from 'viem/chains';
 import {readConfig} from './config.mjs';
 
@@ -66,6 +66,13 @@ export const abi = parseAbi([
   'function extsload(bytes32) view returns (bytes32)',
   'function centsPerDiem() view returns (uint256)',
   'function lastRateCents() view returns (uint64)',
+  // The agent's own door out of its safe. The destination is not a parameter: the safe pays the
+  // registry's account row, so this call can only ever move money toward the agent itself.
+  'function withdraw(address token, uint256 amount)',
+  'error OverDailyLimit(uint256 requested, uint256 remaining)',
+  'error NotAgent()',
+  'error ZeroAmount()',
+  'error NativeTransferFailed()',
 ]);
 
 /**
@@ -86,17 +93,23 @@ const PUBLIC_RPCS = [
   'https://1rpc.io/base',
 ];
 
-export function client(rpc = process.env.KAIRENCE_RPC) {
+function transport(rpc = process.env.KAIRENCE_RPC) {
   const urls = rpc ? [rpc] : PUBLIC_RPCS;
-  return createPublicClient({
-    chain: base,
-    transport: fallback(
-      urls.map((url) => http(url, {timeout: 12_000, retryCount: 1})),
-      // In order, not by measured speed: ranking probes every endpoint on a schedule, which is
-      // more traffic to a shared node than the reads we came for.
-      {rank: false},
-    ),
-  });
+  return fallback(
+    urls.map((url) => http(url, {timeout: 12_000, retryCount: 1})),
+    // In order, not by measured speed: ranking probes every endpoint on a schedule, which is
+    // more traffic to a shared node than the reads we came for.
+    {rank: false},
+  );
+}
+
+export function client(rpc) {
+  return createPublicClient({chain: base, transport: transport(rpc)});
+}
+
+/** The same endpoints, with a key behind them. Only `withdraw` needs this. */
+export function walletClient(account, rpc) {
+  return createWalletClient({account, chain: base, transport: transport(rpc)});
 }
 
 export const ADDRESS = /^0x[0-9a-fA-F]{40}$/;

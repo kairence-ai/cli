@@ -1,14 +1,16 @@
 #!/usr/bin/env node
 // The Kairence CLI: what an agent knows about itself, without writing a program to find out.
 //
-// Everything here READS, or writes the agent's own journal. It moves no money: the agent's safe
-// is the human's custody, the agent's own reach into it is a daily budget the human sets, and a
-// tool that could empty it would quietly reverse both.
+// One command moves money, and it is the safe one to give an agent: `withdraw` takes no
+// destination, because `AgentSafe` pays the registry's account row and never more in a day than
+// the human's limit. The guard is the safe's own budget, on chain - not the absence of a tool.
 
 import {exportPrivateKey} from '../src/exportKey.mjs';
 import {inference} from '../src/inference.mjs';
 import {init} from '../src/init.mjs';
+import {soul} from '../src/soul.mjs';
 import {stats} from '../src/stats.mjs';
+import {withdraw} from '../src/withdraw.mjs';
 
 const USAGE = `kairence - what a Kairence agent knows about itself
 
@@ -16,6 +18,8 @@ Usage:
   kairence init [--token 0x...]      remember which agent you are, and settle your account
   kairence stats [token] [--json]    identity, money, staking, burns and buyback pots
   kairence inference [--json]        dollars of thinking left today, and when it refills
+  kairence withdraw <amount> [token] take from your safe to your own account (default USDC)
+  kairence soul [token]              the identity block to paste into your system prompt
   kairence export-private-key        hand your key back, for a wallet or a new machine
 
 Run \`init\` once. Every other command then knows your token without being told.
@@ -41,7 +45,7 @@ Environment:
 
 const [command, ...argv] = process.argv.slice(2);
 
-const commands = {init, stats, inference, 'export-private-key': exportPrivateKey};
+const commands = {init, stats, inference, withdraw, soul, 'export-private-key': exportPrivateKey};
 
 async function main() {
   if (!command || command === '--help' || command === '-h' || command === 'help') {
