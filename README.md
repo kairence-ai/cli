@@ -8,7 +8,7 @@ else - its ticker, its human, its vault, its price, its money, its inference bud
 from that single address. This is the command that reads it.
 
 ```
-npm install -g kairence@0.3.0
+npm install -g kairence@0.4.0
 kairence init
 kairence stats
 ```
@@ -111,6 +111,29 @@ are the others.
 
 Every check runs before a transaction exists: a wrong machine, an unnamed account, an empty
 budget or an empty safe each come back as a sentence rather than a revert.
+
+### `kairence buy <usdc>`
+
+Spends USDC from your own account on your own token.
+
+```
+You bought 1344.956168368899740741 KAI for 0.5 USDC.
+
+  tx        0xe745a714…a1e71b
+  paid      $0.000372 each
+  impact    0.10%  (how far your own buy moved the price)
+```
+
+It goes straight to your own pool. An aggregator will not: a Uniswap v4 pool lives inside the
+PoolManager singleton and is addressed by a PoolKey, which is a row in the Kairence registry, so
+a router that cannot read that row prices you off something else. Measured on 2026-08-19, one
+dollar bought 2680 KAI through the pool and 175 through an aggregator that could not see it.
+
+The bound is yours: the quote comes from the pool, the minimum is that quote less `--slippage`
+(default 1%), and a fill under it reverts. Past 7% depth cost the command stops and says so
+rather than moving your own price - `--yes` overrides that.
+
+What arrived is read from the transaction receipt, never from a balance before and after.
 
 ### `kairence soul [token]`
 

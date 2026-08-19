@@ -5,6 +5,7 @@
 // destination, because `AgentSafe` pays the registry's account row and never more in a day than
 // the human's limit. The guard is the safe's own budget, on chain - not the absence of a tool.
 
+import {buy} from '../src/buy.mjs';
 import {exportPrivateKey} from '../src/exportKey.mjs';
 import {inference} from '../src/inference.mjs';
 import {init} from '../src/init.mjs';
@@ -19,6 +20,7 @@ Usage:
   kairence stats [token] [--json]    identity, money, staking, burns and buyback pots
   kairence inference [--json]        dollars of thinking left today, and when it refills
   kairence withdraw <amount> [token] take from your safe to your own account (default USDC)
+  kairence buy <usdc>                spend USDC on your own token, through your own pool
   kairence soul [token]              the identity block to paste into your system prompt
   kairence export-private-key        hand your key back, for a wallet or a new machine
 
@@ -30,6 +32,7 @@ Options:
   --account 0x...                    (init) a wallet you already have; skips minting a key
   --rotate                           (init) retire the standing key and mint a fresh one
   --set-key                          (inference) store your Venice key, read from stdin only
+  --slippage <pct>                   (buy) your own bound on the fill, default 1
   --out <file>                       (export-private-key) write it 0600 instead of printing
   --yes                              (export-private-key) print it without being asked twice
   --help                             this text
@@ -45,7 +48,7 @@ Environment:
 
 const [command, ...argv] = process.argv.slice(2);
 
-const commands = {init, stats, inference, withdraw, soul, 'export-private-key': exportPrivateKey};
+const commands = {init, stats, inference, withdraw, buy, soul, 'export-private-key': exportPrivateKey};
 
 async function main() {
   if (!command || command === '--help' || command === '-h' || command === 'help') {
