@@ -1,9 +1,14 @@
-// `kairence buy <usdc>` - the agent buying its own token, out of its own account.
+// `kairence buy <usdc> [token]` - buying any token on the launchpad, out of the agent's own
+// account. With nothing named it buys the agent's own; a ticker or an address names another.
 //
 // It buys through the USDC pool, not the kDIEM one: USDC is what a withdrawal pays out, and the
 // USDC pair is the leg aggregators route. Nothing here is Kairence infrastructure except the
 // registry row that hands over the pool key - the fill is canonical Uniswap, the same path any
 // other buyer takes.
+//
+// Only registered agents, and that is a guard rather than a limitation: the whole method here is
+// reading a pool key out of the registry, so a token with no row has no key and would have to be
+// priced off something this command cannot see.
 //
 // The bound is the agent's own. There is no oracle and no protocol-side floor: the quote comes
 // from the pool, the minimum is that quote less a tolerance, and a fill under it reverts. Past a
@@ -16,6 +21,7 @@ import {ADDRESSES as A, DECIMALS as D, abi, client, requireToken, walletClient} 
 import {readConfig} from './config.mjs';
 import {keyPath, readKey} from './key.mjs';
 import {flagValue} from './prompt.mjs';
+import {resolveToken} from './roster.mjs';
 import {poolStateSlot, priceIn} from './price.mjs';
 import {
   IMPACT_STOP_PCT,
@@ -58,7 +64,7 @@ export async function buy(argv) {
   const json = argv.includes('--json');
   const force = argv.includes('--yes');
 
-  const token = requireToken(bare[1]);
+  const token = bare[1] ? await resolveToken(bare[1]) : requireToken();
   let amountIn;
   try {
     amountIn = parseUnits(bare[0], D.usdc);
@@ -84,6 +90,11 @@ export async function buy(argv) {
   }
   const account = privateKeyToAccount(key);
   const c = client();
+
+  const registered = await c.readContract({address: A.registry, abi, functionName: 'isAgent', args: [token]});
+  if (!registered) {
+    throw new Error(`${token} is not a token from this launchpad - \`kairence agents\` lists the ones that are`);
+  }
 
   const [poolKey, held, gas] = await Promise.all([
     c.readContract({address: A.registry, abi: tradeAbi, functionName: 'poolKey', args: [token, LEG_USDC]}),

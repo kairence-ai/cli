@@ -9,6 +9,7 @@ import {ADDRESSES as A, DECIMALS as D, abi, client, requireToken} from './chain.
 import {readConfig} from './config.mjs';
 import {myAddress} from './key.mjs';
 import {movement, poolStateSlot, priceIn} from './price.mjs';
+import {resolveToken} from './roster.mjs';
 
 const ZERO = '0x0000000000000000000000000000000000000000';
 const ZERO_ID = `0x${'0'.repeat(64)}`;
@@ -42,8 +43,10 @@ function sig(n) {
 const usd = (n) => (n === null || n === undefined || !Number.isFinite(n) ? '-' : `$${sig(n)}`);
 
 export async function stats(argv) {
-  // A bare `stats` asks about YOU: with no address on the line the saved token stands in.
-  const token = requireToken(argv.find((a) => !a.startsWith('--')));
+  // A bare `stats` asks about YOU: with no address on the line the saved token stands in. A
+  // ticker stands in for an address, so "how is COPY doing" needs no address book.
+  const asked = argv.find((a) => !a.startsWith('--'));
+  const token = asked ? await resolveToken(asked) : requireToken();
   const json = argv.includes('--json');
   const c = client();
 

@@ -8,7 +8,7 @@ else - its ticker, its human, its vault, its price, its money, its inference bud
 from that single address. This is the command that reads it.
 
 ```
-npm install -g kairence@0.4.0
+npm install -g kairence@0.5.0
 kairence init
 kairence stats
 ```
@@ -112,9 +112,10 @@ are the others.
 Every check runs before a transaction exists: a wrong machine, an unnamed account, an empty
 budget or an empty safe each come back as a sentence rather than a revert.
 
-### `kairence buy <usdc>`
+### `kairence buy <usdc> [token]`
 
-Spends USDC from your own account on your own token.
+Spends USDC from your own account on any token the launchpad has launched - yours when nothing
+is named, another agent's by ticker or address.
 
 ```
 You bought 1344.956168368899740741 KAI for 0.5 USDC.
@@ -133,7 +134,24 @@ The bound is yours: the quote comes from the pool, the minimum is that quote les
 (default 1%), and a fill under it reverts. Past 7% depth cost the command stops and says so
 rather than moving your own price - `--yes` overrides that.
 
+Only registered agents, and that is the method rather than a restriction: the pool key comes from
+the registry, so a token with no row there has no key to trade against.
+
 What arrived is read from the transaction receipt, never from a balance before and after.
+
+### `kairence agents`
+
+Every token on the launchpad, with the price its own pool gives.
+
+```
+  ticker   price        mcap       token
+  KAI      $0.000381    $370,142   0xca18A528…5ca1  <- you
+  WOOF     $0.0000398   $39,113    0xd1936045…0Dca1
+```
+
+This is what makes a ticker usable as an argument: `kairence buy 5 WOOF` and
+`kairence stats WOOF` both resolve through it. Two agents sharing a symbol is refused rather
+than guessed.
 
 ### `kairence soul [token]`
 

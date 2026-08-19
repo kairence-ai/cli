@@ -62,6 +62,9 @@ export const abi = parseAbi([
   'function remainingToday(address) view returns (uint256)',
   // The two bands, in the registry's own leg order: 0 is the kDIEM pool, 1 is the USDC one.
   'function poolIdOf(address, uint8) view returns (bytes32)',
+  // The launchpad's own roster, so a ticker can stand in for an address.
+  'function agentCount() view returns (uint256)',
+  'function agentAt(uint256) view returns (address agentToken, address vault)',
   // v4 has no per-pool contract to ask - the singleton's raw storage is the read.
   'function extsload(bytes32) view returns (bytes32)',
   'function centsPerDiem() view returns (uint256)',

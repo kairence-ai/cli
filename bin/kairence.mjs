@@ -5,6 +5,7 @@
 // destination, because `AgentSafe` pays the registry's account row and never more in a day than
 // the human's limit. The guard is the safe's own budget, on chain - not the absence of a tool.
 
+import {agents} from '../src/agents.mjs';
 import {buy} from '../src/buy.mjs';
 import {exportPrivateKey} from '../src/exportKey.mjs';
 import {inference} from '../src/inference.mjs';
@@ -18,9 +19,10 @@ const USAGE = `kairence - what a Kairence agent knows about itself
 Usage:
   kairence init [--token 0x...]      remember which agent you are, and settle your account
   kairence stats [token] [--json]    identity, money, staking, burns and buyback pots
+  kairence agents [--json]           every token on the launchpad, with its price
   kairence inference [--json]        dollars of thinking left today, and when it refills
   kairence withdraw <amount> [token] take from your safe to your own account (default USDC)
-  kairence buy <usdc>                spend USDC on your own token, through your own pool
+  kairence buy <usdc> [token]        buy any launchpad token - yours by default
   kairence soul [token]              the identity block to paste into your system prompt
   kairence export-private-key        hand your key back, for a wallet or a new machine
 
@@ -48,7 +50,7 @@ Environment:
 
 const [command, ...argv] = process.argv.slice(2);
 
-const commands = {init, stats, inference, withdraw, buy, soul, 'export-private-key': exportPrivateKey};
+const commands = {init, stats, agents, inference, withdraw, buy, soul, 'export-private-key': exportPrivateKey};
 
 async function main() {
   if (!command || command === '--help' || command === '-h' || command === 'help') {
