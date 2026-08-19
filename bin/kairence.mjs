@@ -37,6 +37,7 @@ Options:
   --account 0x...                    (init) a wallet you already have; skips minting a key
   --persona "..."                    (init) the character, in your human's words
   --persona-file <path>              (init) the same, from a file
+  --profile <name>                   (init) the Hermes profile to make this agent's home
   --no-soul                          (init) leave the harness's system prompt alone
   --rotate                           (init) retire the standing key and mint a fresh one
   --set-key                          (inference) store your Venice key, read from stdin only

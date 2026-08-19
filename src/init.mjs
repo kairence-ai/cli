@@ -15,6 +15,7 @@ import {dirFor, legacyFile, legacyToken, listAgents, whoAmI} from './home.mjs';
 import {currentAddress, ensureRoom, keyPath, mint, retire} from './key.mjs';
 import {ask, flagValue} from './prompt.mjs';
 import {detect, offerSoul} from './soul.mjs';
+import {hermesProfiles} from './harness.mjs';
 
 const PRIVATE_KEY = /^(0x)?[0-9a-fA-F]{64}$/;
 
@@ -204,7 +205,7 @@ export async function init(argv) {
   let persona = flagValue(argv, 'persona') ?? readConfig(token).persona ?? null;
   const personaFile = flagValue(argv, 'persona-file');
   if (personaFile) persona = readFileSync(personaFile, 'utf8').trim();
-  const wantsSoul = !argv.includes('--no-soul') && detect().length > 0;
+  const wantsSoul = !argv.includes('--no-soul') && (detect().length > 0 || hermesProfiles().length > 0);
   if (wantsSoul && !persona && !json && process.stdin.isTTY) {
     console.log(`\nOne more thing, and this one only you can answer.\n`);
     console.log(`  Who is ${found?.ticker ?? 'this agent'}? A sentence or two, in your own words - it goes`);
@@ -272,5 +273,14 @@ export async function init(argv) {
     console.log(instructions(address, token, held));
   }
 
-  if (wantsSoul) await offerSoul(token, persona);
+  if (wantsSoul) {
+    try {
+      await offerSoul(token, persona, flagValue(argv, 'profile'));
+    } catch (e) {
+      // The account is set up and the key is on disk; only the harness step failed. Reporting
+      // that as a failed init would send someone back to re-run what already worked.
+      console.log(`\n  prompt    not written - ${e.message}`);
+      console.log(`            everything above is done; fix that and run \`kairence init\` again`);
+    }
+  }
 }

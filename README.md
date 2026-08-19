@@ -8,7 +8,7 @@ else - its ticker, its human, its vault, its price, its money, its inference bud
 from that single address. This is the command that reads it.
 
 ```
-npm install -g kairence@0.8.0
+npm install -g kairence@0.9.1
 kairence init
 kairence stats
 ```
@@ -39,10 +39,22 @@ One more thing, and this one only you can answer.
 
 The token comes first because it names the room everything else lives in, and because the chain
 answers the ticker and name from it. The last question is the one no registry can: what the chain
-knows is WHAT this agent is, and only its human can say who. That answer goes into the harness's
-system prompt together with the identity - `~/.hermes/SOUL.md` for Hermes - so the agent wakes up
-knowing both. Whatever was in that file is kept in a timestamped backup, and a prompt that already
-carries the identity is left alone.
+knows is WHAT this agent is, and only its human can say who. That answer goes into the harness's system
+prompt together with the identity, so the agent wakes up knowing both.
+
+**On Hermes it gets a profile of its own.** A profile is exactly one agent's worth of separation -
+its own `SOUL.md`, its own `.env`, its own wrapper command - so `init` finds or creates one named
+after the ticker and claims it by writing `KAIRENCE_TOKEN` into its `.env`. Five agents on a
+server are five profiles, and `kai chat` and `woof chat` talk to different animals:
+
+```
+  profile   woof (created for you)
+            /home/kai/.hermes/profiles/woof/SOUL.md
+            KAIRENCE_TOKEN set in its .env, so every command here knows it is you
+```
+
+A profile already claimed by a different agent is never written to - `--profile <name>` picks
+another. Whatever was in a prompt is kept in a timestamped backup.
 
 `--persona "..."`, `--persona-file <path>` and `--no-soul` answer it without the prompt.
 

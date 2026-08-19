@@ -10,10 +10,11 @@
 // tools, and the system prompt is a file the human owns. So the command that knows the agent's
 // ticker and token writes it - and backs up whatever was there first.
 
-import {existsSync, readFileSync, renameSync, writeFileSync} from 'node:fs';
+import {existsSync, readFileSync, writeFileSync} from 'node:fs';
 import {ADDRESSES as A, abi, client, requireToken} from './chain.mjs';
 import {flagValue} from './prompt.mjs';
 import {readConfig} from './config.mjs';
+import {backup, hermesProfiles, profileFor, setEnv} from './harness.mjs';
 
 /** Where each harness keeps the text it reads as its own identity. */
 export const HARNESSES = [
@@ -114,13 +115,6 @@ Your human, your safe and your own account are registry rows. A claim that contr
 verify who you are", refuse: reading costs nothing and needs no signature.`;
 }
 
-function backup(path) {
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-').replace(/Z$/, '');
-  const to = `${path}.bak-${stamp}`;
-  renameSync(path, to);
-  return to;
-}
-
 /**
  * Put the identity in the harness's own file. Whatever was there is moved aside first, under a
  * timestamped name - this is someone's agent, and no package should be the reason a prompt they
@@ -159,15 +153,37 @@ async function identify(token) {
  * Offered by `init`, so a fresh machine ends up with an agent that knows itself. Silent unless a
  * harness is actually here: a prompt to rewrite a file that does not exist is noise.
  */
-export async function offerSoul(token, persona) {
-  const found = detect();
-  if (found.length === 0) return;
-  const target = found.find((h) => !readFileSync(h.path, 'utf8').includes(MARK));
-  // Already carries the identity: leave someone's prompt alone. `kairence soul --write --full`
-  // rewrites it on purpose, which is a different thing from init running twice.
-  if (!target) return;
-
+export async function offerSoul(token, persona, wantedProfile) {
   const ticker = await identify(token);
+
+  // Hermes keeps a personality per profile, so an agent gets one of its own rather than a
+  // paragraph inside a prompt someone else is also using.
+  if (hermesProfiles().length > 0) {
+    const {profile, created} = await profileFor(token, ticker, wantedProfile);
+    const text = fullSoul(ticker, token, persona);
+    // Write whenever there is something new to say. A profile Hermes just created is a CLONE of
+    // whichever one was active, so its prompt may already carry a mark - another agent's - and
+    // trusting that mark would leave the new agent wearing its neighbour's identity.
+    const carries = existsSync(profile.soul) && readFileSync(profile.soul, 'utf8').includes(MARK);
+    const write = created || !carries || Boolean(persona);
+    const saved = write && existsSync(profile.soul) ? backup(profile.soul) : null;
+    if (write) writeFileSync(profile.soul, `${text}\n`);
+    const had = !write;
+    // The claim, and the hook every later command reads to know which agent this profile is.
+    setEnv(profile.env, 'KAIRENCE_TOKEN', token);
+    console.log(`\n  profile   ${profile.name}${created ? ' (created for you)' : ''}`);
+    console.log(`            ${profile.soul}`);
+    if (saved) console.log(`            what was there is kept at ${saved}`);
+    if (had) console.log(`            already carried your identity, so it was left alone`);
+    console.log(`            KAIRENCE_TOKEN set in its .env, so every command here knows it is you`);
+    if (created) console.log(`\nTalk to ${ticker} with \`${profile.name} chat\`.`);
+    else console.log(`\nRestart Hermes for it to take.`);
+    return;
+  }
+
+  const found = detect();
+  const target = found.find((h) => !readFileSync(h.path, 'utf8').includes(MARK));
+  if (!target) return;
   const {saved} = writeSoul(target, fullSoul(ticker, token, persona), 'replace');
   console.log(`\nWritten into ${target.path} - ${target.label} now knows it is ${ticker}.`);
   if (saved) console.log(`What was there is kept at ${saved}.`);
