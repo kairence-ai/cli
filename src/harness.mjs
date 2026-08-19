@@ -37,7 +37,7 @@ export function hermesProfiles() {
 
 /** The token a profile has been claimed by, or null when nobody has claimed it. */
 export function claimOf(profile) {
-  if (!existsSync(profile.env)) return null;
+  if (!profile?.env || !existsSync(profile.env)) return null;
   const line = readFileSync(profile.env, 'utf8')
     .split('\n')
     .find((l) => l.startsWith('KAIRENCE_TOKEN='));
@@ -67,9 +67,20 @@ function run(cmd, args) {
   });
 }
 
-/** A profile name Hermes accepts: lowercase and alphanumeric. */
-export function profileName(ticker) {
-  return ticker.toLowerCase().replace(/[^a-z0-9]/g, '') || 'agent';
+/**
+ * A profile name Hermes accepts: lowercase and alphanumeric.
+ *
+ * The token is the identity and the ticker is a handle, and the two are named differently on
+ * purpose. Keys live under the address because money must never be filed by a name anyone can
+ * reuse; a profile is named by the ticker because a human types it - `woof chat`, not
+ * `0xd193604529ac73f252c8c9e1b8bbc45db260dca1 chat`.
+ *
+ * Tickers do collide, rarely. When one does, the tail of the address settles it: `woof-0dca1` is
+ * still typeable and can only ever mean one agent.
+ */
+export function profileName(ticker, token) {
+  const base = ticker.toLowerCase().replace(/[^a-z0-9]/g, '') || 'agent';
+  return token ? {base, unique: `${base}-${token.slice(-5).toLowerCase()}`} : {base, unique: base};
 }
 
 /**
@@ -87,8 +98,15 @@ export async function profileFor(token, ticker, wanted) {
   const mine = profiles.find((p) => claimOf(p)?.toLowerCase() === token.toLowerCase());
   if (mine) return {profile: mine, created: false};
 
-  const name = wanted || profileName(ticker);
-  const existing = profiles.find((p) => p.name === name);
+  const {base, unique} = profileName(ticker, token);
+  let name = wanted || base;
+  const taken = (n) => profiles.find((p) => p.name === n);
+  if (!wanted && claimOf(taken(name))) {
+    // Another agent already answers to this ticker. The tail of the address separates them, and
+    // it is the address rather than a counter because "woof2" says nothing about which is which.
+    name = unique;
+  }
+  const existing = taken(name);
   if (existing) {
     const claim = claimOf(existing);
     if (claim) {
@@ -109,12 +127,39 @@ export async function profileFor(token, ticker, wanted) {
   try {
     await run('hermes', ['profile', 'create', name, '--clone', '--description', `${ticker}, a Kairence agent`]);
   } catch (e) {
-    if (e.code === 'ENOENT') return {profile: fallback ?? profiles[0], created: false};
+    if (e.code === 'ENOENT') {
+      // No hermes to run. Falling back to whatever profile happens to be here is how two agents
+      // end up sharing one prompt - the exact thing a profile exists to prevent - so say what is
+      // needed instead of quietly writing into someone else's.
+      throw new Error(
+        `this agent needs a Hermes profile of its own ("${name}"), and the hermes command is not on PATH here - run \`hermes profile create ${name} --clone\` and then \`kairence init\` again`,
+      );
+    }
     throw new Error(`could not create the Hermes profile "${name}" - ${e.message}`);
   }
   const made = hermesProfiles().find((p) => p.name === name);
   if (!made) throw new Error(`Hermes reported no profile "${name}" after creating it`);
-  return {profile: made, created: true};
+  const inherited = disinherit(made);
+  return {profile: made, created: true, inherited};
+}
+
+/**
+ * Move a cloned profile's memories aside.
+ *
+ * `hermes profile create --clone` copies the memories along with the config, and built-in memory
+ * outranks the prompt: a new agent inherited a `USER.md` reading "I am KAI, the first autonomous
+ * agent" and introduced itself as KAI no matter what its own SOUL.md said. Those notes are the
+ * OTHER agent's, by construction, so a fresh profile must not start holding them.
+ *
+ * Moved, never deleted - they are still someone's memory, just not this one's.
+ */
+export function disinherit(profile) {
+  const dir = join(profile.path, 'memories');
+  if (!existsSync(dir)) return null;
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-').replace(/Z$/, '');
+  const to = `${dir}.cloned-${stamp}`;
+  renameSync(dir, to);
+  return to;
 }
 
 /** Whatever was in the prompt is kept, timestamped. This is someone's agent. */

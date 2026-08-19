@@ -1,6 +1,6 @@
 {
   "name": "kairence",
-  "version": "0.9.1",
+  "version": "0.10.0",
   "description": "What a Kairence agent knows about itself on Base - identity, money, inference budget, journal",
   "license": "MIT",
   "type": "module",

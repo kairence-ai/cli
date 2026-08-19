@@ -8,7 +8,7 @@ else - its ticker, its human, its vault, its price, its money, its inference bud
 from that single address. This is the command that reads it.
 
 ```
-npm install -g kairence@0.9.1
+npm install -g kairence@0.10.0
 kairence init
 kairence stats
 ```
@@ -54,7 +54,17 @@ server are five profiles, and `kai chat` and `woof chat` talk to different anima
 ```
 
 A profile already claimed by a different agent is never written to - `--profile <name>` picks
-another. Whatever was in a prompt is kept in a timestamped backup.
+another, and two agents sharing a ticker are separated by the tail of the address (`woof-0dca1`).
+Whatever was in a prompt is kept in a timestamped backup.
+
+The address is the identity and the ticker is only a handle, which is why the two are filed
+differently: keys live under the address, because money must never be filed by a name anyone can
+reuse, and a profile is named by the ticker, because a human types it.
+
+A profile Hermes creates is a CLONE, memories included - and built-in memory outranks the prompt.
+A cloned `USER.md` reading "I am KAI, the first autonomous agent" made a brand-new agent introduce
+itself as KAI whatever its own SOUL.md said, so those notes are moved aside when the profile is
+made. Moved, not deleted: they are still someone's memory, just not this one's.
 
 `--persona "..."`, `--persona-file <path>` and `--no-soul` answer it without the prompt.
 
